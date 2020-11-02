@@ -40,4 +40,6 @@ default-features = false
 
 [dev-dependencies]
 pretty_assertions = "0.6"
+rand = "0.7.3"
+rand_pcg = "0.2.1"
 tempfile = "3.1"

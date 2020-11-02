@@ -6,11 +6,8 @@
 
 use super::id;
 use super::simple_passes::outgoing_edges;
-use rspirv::spirv::{Op, Word};
-use rspirv::{
-    dr::{Block, Instruction, Module, ModuleHeader, Operand},
-    spirv::SelectionControl,
-};
+use rspirv::dr::{Block, Instruction, Module, ModuleHeader, Operand};
+use rspirv::spirv::{Op, SelectionControl, Word};
 use rustc_session::Session;
 use std::collections::VecDeque;
 
@@ -605,5 +602,107 @@ pub fn insert_loop_merge_on_conditional_branch(
         check_block
             .instructions
             .insert(check_block.instructions.len() - 1, merge_inst);
+    }
+}
+
+#[cfg(test)]
+mod test {
+    use super::*;
+    use rand::SeedableRng;
+    use rspirv::binary::{Assemble, Disassemble};
+    use rspirv::dr::Builder;
+    use rspirv::spirv::{
+        AddressingModel, Capability, ExecutionModel, FunctionControl, MemoryModel,
+    };
+
+    fn generate_succ(rng: &mut impl rand::Rng) -> Vec<Vec<usize>> {
+        let mut res = vec![Vec::new(); 20];
+        loop {
+            // Only branch forwards for now.
+            let src = rng.gen_range(0, res.len() - 1);
+            let dst = rng.gen_range(src + 1, res.len());
+            let targets = &mut res[src];
+            // Maximum of 2 targets per branch. Use this as a condition that we're done.
+            if targets.len() > 1 {
+                break;
+            }
+            targets.push(dst);
+        }
+        res
+    }
+
+    fn generate_module(succ: Vec<Vec<usize>>) -> Module {
+        let mut builder = Builder::new();
+        builder.capability(Capability::Shader);
+        builder.memory_model(AddressingModel::Logical, MemoryModel::Simple);
+        let void = builder.type_void();
+        let main_ty = builder.type_function(void, vec![]);
+        let boolean = builder.type_bool();
+        let boolfunc_ty = builder.type_function(boolean, vec![]);
+        let false_val = builder.constant_false(boolean);
+        let boolfunc = builder
+            .begin_function(boolean, None, FunctionControl::NONE, boolfunc_ty)
+            .unwrap();
+        builder.begin_block(None).unwrap();
+        builder.ret_value(false_val).unwrap();
+        builder.end_function().unwrap();
+        let main = builder
+            .begin_function(void, None, FunctionControl::NONE, main_ty)
+            .unwrap();
+        let labels = succ.iter().map(|_| builder.id()).collect::<Vec<Word>>();
+        for (index, succs) in succ.into_iter().enumerate() {
+            builder.begin_block(Some(labels[index])).unwrap();
+            match succs[..] {
+                [] => builder.ret().unwrap(),
+                [next] => builder.branch(labels[next]).unwrap(),
+                [a, b] => {
+                    // The `boolfunc` is just a dummy function to obtain an opaque boolean.
+                    let condition = builder
+                        .function_call(boolean, None, boolfunc, vec![])
+                        .unwrap();
+                    builder
+                        .branch_conditional(condition, labels[a], labels[b], std::iter::empty())
+                        .unwrap();
+                }
+                _ => panic!("too many succs: {:?}", succs),
+            }
+        }
+        builder.end_function().unwrap();
+        builder.entry_point(ExecutionModel::Vertex, main, "main", &[]);
+        builder.module()
+    }
+
+    fn validate(original: Module, module: Module) {
+        use spirv_tools::val::{self, Validator};
+        let validator = val::create(None);
+        match validator.validate(&module.assemble(), None) {
+            Ok(()) => (),
+            Err(err) => panic!(
+                "spirv-val failed: {}\n--- original ---:\n{}\n--- structured ---:\n{}",
+                err,
+                original.disassemble(),
+                module.disassemble()
+            ),
+        }
+    }
+
+    #[test]
+    fn fuzz() {
+        // Use Pcg32 to get a reproducible RNG. If this isn't run on CI, we might want to use
+        // thread_rng instead, to test as many cases as possible instead of being deterministic.
+        let mut rand = rand_pcg::Pcg32::from_seed([
+            0x90, 0x5f, 0x7a, 0x62, 0xa9, 0x6a, 0xa3, 0xaa, 0x81, 0x19, 0xad, 0x43, 0x38, 0x9a,
+            0x5c, 0xbc,
+        ]);
+        for _ in 0..100 {
+            let succ = generate_succ(&mut rand);
+            let mut module = generate_module(succ);
+            for f in &mut module.functions {
+                super::super::simple_passes::block_ordering_pass(f);
+            }
+            let original = module.clone();
+            structurize(None, &mut module);
+            validate(original, module);
+        }
     }
 }
