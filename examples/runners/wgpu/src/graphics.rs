@@ -13,6 +13,29 @@ unsafe fn any_as_u32_slice<T: Sized>(p: &T) -> &[u32] {
     )
 }
 
+fn create_texels(size: usize) -> Vec<u8> {
+    use std::iter;
+
+    (0..size * size)
+        .flat_map(|id| {
+            // get high five for recognizing this ;)
+            let cx = 3.0 * (id % size) as f32 / (size - 1) as f32 - 2.0;
+            let cy = 2.0 * (id / size) as f32 / (size - 1) as f32 - 1.0;
+            let (mut x, mut y, mut count) = (cx, cy, 0);
+            while count < 0xFF && x * x + y * y < 4.0 {
+                let old_x = x;
+                x = x * x - y * y + cx;
+                y = 2.0 * old_x * y + cy;
+                count += 1;
+            }
+            iter::once(0xFF - (count * 5) as u8)
+                .chain(iter::once(0xFF - (count * 15) as u8))
+                .chain(iter::once(0xFF - (count * 50) as u8))
+                .chain(iter::once(1))
+        })
+        .collect()
+}
+
 async fn run(
     options: &Options,
     event_loop: EventLoop<()>,
@@ -61,13 +84,93 @@ async fn run(
     // Load the shaders from disk
     let module = device.create_shader_module(shader_module(options.shader));
 
+    let bind_group_layout = device.create_bind_group_layout(&wgpu::BindGroupLayoutDescriptor {
+        label: None,
+        entries: &[
+            wgpu::BindGroupLayoutEntry {
+                binding: 0,
+                visibility: wgpu::ShaderStage::FRAGMENT,
+                ty: wgpu::BindingType::SampledTexture {
+                    multisampled: false,
+                    component_type: wgpu::TextureComponentType::Float,
+                    dimension: wgpu::TextureViewDimension::D2,
+                },
+                count: None,
+            },
+            wgpu::BindGroupLayoutEntry {
+                binding: 1,
+                visibility: wgpu::ShaderStage::FRAGMENT,
+                ty: wgpu::BindingType::Sampler { comparison: false },
+                count: None,
+            },
+        ],
+    });
+
     let pipeline_layout = device.create_pipeline_layout(&wgpu::PipelineLayoutDescriptor {
         label: None,
-        bind_group_layouts: &[],
+        bind_group_layouts: &[&bind_group_layout],
         push_constant_ranges: &[wgpu::PushConstantRange {
             stages: wgpu::ShaderStage::all(),
             range: 0..std::mem::size_of::<ShaderConstants>() as u32,
         }],
+    });
+
+    // Create the texture
+    let image_size = 256u32;
+    let texels = create_texels(image_size as usize);
+    let texture_extent = wgpu::Extent3d {
+        width: image_size,
+        height: image_size,
+        depth: 1,
+    };
+    let texture = device.create_texture(&wgpu::TextureDescriptor {
+        label: None,
+        size: texture_extent,
+        mip_level_count: 1,
+        sample_count: 1,
+        dimension: wgpu::TextureDimension::D2,
+        format: wgpu::TextureFormat::Rgba8UnormSrgb,
+        usage: wgpu::TextureUsage::SAMPLED | wgpu::TextureUsage::COPY_DST,
+    });
+    let texture_view = texture.create_view(&wgpu::TextureViewDescriptor::default());
+    queue.write_texture(
+        wgpu::TextureCopyView {
+            texture: &texture,
+            mip_level: 0,
+            origin: wgpu::Origin3d::ZERO,
+        },
+        &texels,
+        wgpu::TextureDataLayout {
+            offset: 0,
+            bytes_per_row: 4 * image_size,
+            rows_per_image: 0,
+        },
+        texture_extent,
+    );
+    let sampler = device.create_sampler(&wgpu::SamplerDescriptor {
+        address_mode_u: wgpu::AddressMode::ClampToEdge,
+        address_mode_v: wgpu::AddressMode::ClampToEdge,
+        address_mode_w: wgpu::AddressMode::ClampToEdge,
+        mag_filter: wgpu::FilterMode::Nearest,
+        min_filter: wgpu::FilterMode::Linear,
+        mipmap_filter: wgpu::FilterMode::Nearest,
+        ..Default::default()
+    });
+
+    // Create bind group
+    let bind_group = device.create_bind_group(&wgpu::BindGroupDescriptor {
+        layout: &bind_group_layout,
+        entries: &[
+            wgpu::BindGroupEntry {
+                binding: 0,
+                resource: wgpu::BindingResource::TextureView(&texture_view),
+            },
+            wgpu::BindGroupEntry {
+                binding: 1,
+                resource: wgpu::BindingResource::Sampler(&sampler),
+            },
+        ],
+        label: None,
     });
 
     let render_pipeline = device.create_render_pipeline(&wgpu::RenderPipelineDescriptor {
@@ -166,6 +269,7 @@ async fn run(
                             time: start.elapsed().as_secs_f32(),
                         };
                         rpass.set_pipeline(&render_pipeline);
+                        rpass.set_bind_group(0, &bind_group, &[]);
                         rpass.set_push_constants(wgpu::ShaderStage::all(), 0, unsafe {
                             any_as_u32_slice(&push_constants)
                         });
