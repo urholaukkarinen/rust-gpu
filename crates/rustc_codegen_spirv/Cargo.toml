@@ -37,6 +37,7 @@ smallvec = "1.6.1"
 spirv-tools = { version = "0.4.0", default-features = false }
 tar = "0.4.30"
 topological-sort = "0.1"
+num-traits = "0.2.14"
 
 [dev-dependencies]
 pipe = "0.4"

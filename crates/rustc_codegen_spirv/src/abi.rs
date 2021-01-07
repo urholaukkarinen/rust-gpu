@@ -8,17 +8,21 @@ use rspirv::spirv::{Capability, StorageClass, Word};
 use rustc_middle::bug;
 use rustc_middle::ty::layout::{FnAbiExt, TyAndLayout};
 use rustc_middle::ty::subst::SubstsRef;
-use rustc_middle::ty::{GeneratorSubsts, PolyFnSig, Ty, TyKind, TypeAndMut};
+use rustc_middle::ty::{GeneratorSubsts, ParamEnv, PolyFnSig, Ty, TyKind, IntTy, UintTy, FloatTy, TypeAndMut};
 use rustc_span::def_id::DefId;
 use rustc_span::Span;
 use rustc_target::abi::call::{CastTarget, FnAbi, PassMode, Reg, RegKind};
 use rustc_target::abi::{
     Abi, Align, FieldsShape, LayoutOf, Primitive, Scalar, Size, TagEncoding, VariantIdx, Variants,
+    HasDataLayout
 };
 use std::cell::RefCell;
 use std::collections::hash_map::Entry;
 use std::collections::HashMap;
 use std::fmt;
+
+use num_traits::cast::FromPrimitive;
+use rspirv::spirv;
 
 /// If a struct contains a pointer to itself, even indirectly, then doing a naiive recursive walk
 /// of the fields will result in an infinite loop. Because pointers are the only thing that are
@@ -801,22 +805,92 @@ fn trans_image<'tcx>(
     attr: SpirvAttribute,
 ) -> Option<Word> {
     match attr {
-        SpirvAttribute::ImageType {
-            dim,
-            depth,
-            arrayed,
-            multisampled,
-            sampled,
-            image_format,
-            access_qualifier,
-        } => {
+        SpirvAttribute::ImageType => {
             // see SpirvType::sizeof
             if ty.size != Size::from_bytes(4) {
                 cx.tcx.sess.err("#[spirv(image)] type must have size 4");
                 return None;
             }
-            // Hardcode to float for now
-            let sampled_type = SpirvType::Float(32).def(span, cx);
+
+            let sampled_type = match substs.type_at(0).kind() {
+                TyKind::Int(int) => {
+                    let width: u32 = match int {
+                        IntTy::Isize => cx.data_layout().pointer_size.bits() as u32,
+                        IntTy::I8 => 8,
+                        IntTy::I16 => 16,
+                        IntTy::I32 => 32,
+                        IntTy::I64 => 64,
+                        IntTy::I128 => 128,
+                    };
+
+                    SpirvType::Integer(width, true).def(span, cx)
+                }
+                TyKind::Float(float) => {
+                    let width = match float {
+                        FloatTy::F32 => 32,
+                        FloatTy::F64 => 64,
+                    };
+
+                    SpirvType::Float(width).def(span, cx)
+                }
+                TyKind::Uint(uint) => {
+                    let width: u32 = match uint {
+                        UintTy::Usize => cx.data_layout().pointer_size.bits() as u32,
+                        UintTy::U8 => 8,
+                        UintTy::U16 => 16,
+                        UintTy::U32 => 32,
+                        UintTy::U64 => 64,
+                        UintTy::U128 => 128,
+                    };
+
+                    SpirvType::Integer(width, false).def(span, cx)
+                }
+                _ => unreachable!(),
+            };
+
+            macro_rules! type_from_variant_discriminant {
+                ($(let $name:ident : $ty:ty = $exp:expr);+ ;) => {
+                    $(let $name = {
+                        let const_ = $exp;
+                        let adt_def = const_.ty.ty_adt_def().unwrap();
+                        assert!(adt_def.is_enum());
+                        let destructured = cx.tcx.destructure_const(ParamEnv::reveal_all().and(const_));
+                        let idx = destructured.variant.unwrap();
+                        let value = const_.ty
+                            .discriminant_for_variant(cx.tcx, idx)
+                            .unwrap()
+                            .val as u64;
+                        <$ty>::from_u64(value).unwrap()
+                    };)+
+                }
+            }
+
+            type_from_variant_discriminant! {
+                let dim: spirv::Dim = substs.const_at(1);
+                let depth: u32 = substs.const_at(2);
+                let arrayed: u32 = substs.const_at(3);
+                let multisampled: u32 = substs.const_at(4);
+                let sampled: u32 = substs.const_at(5);
+                let image_format: spirv::ImageFormat = substs.const_at(6);
+            }
+
+            let access_qualifier = {
+                let option = cx
+                    .tcx
+                    .destructure_const(ParamEnv::reveal_all().and(substs.const_at(6)));
+
+                match option.variant.map(|i| i.as_u32()).unwrap_or(0) {
+                    0 => None,
+                    1 => {
+                        type_from_variant_discriminant! {
+                            let access_qualifier: spirv::AccessQualifier = option.fields[0];
+                        }
+                        Some(access_qualifier)
+                    }
+                    _ => unreachable!(),
+                }
+            };
+
             let ty = SpirvType::Image {
                 sampled_type,
                 dim,

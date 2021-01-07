@@ -1,7 +1,14 @@
 #![no_std]
 #![cfg_attr(
     target_arch = "spirv",
-    feature(asm, register_attr, repr_simd, core_intrinsics, lang_items),
+    feature(
+        asm,
+        register_attr,
+        repr_simd,
+        core_intrinsics,
+        lang_items
+    ),
+    allow(incomplete_features),
     register_attr(spirv)
 )]
 // BEGIN - Embark standard lints v0.3
@@ -63,7 +70,10 @@
     // We deblierately provide an unimplemented version of our API on CPU
     // platforms so that code completion still works.
     clippy::unimplemented,
+    // The part of `const-generics` we're using (C-like enums) is not incomplete.
+    incomplete_features,
 )]
+#![feature(const_generics)]
 
 #[macro_use]
 #[cfg(not(target_arch = "spirv"))]
@@ -72,14 +82,16 @@ pub extern crate spirv_std_macros as macros;
 pub mod arch;
 pub mod float;
 pub mod integer;
+pub mod number;
 pub mod scalar;
 pub(crate) mod sealed;
 pub mod storage_class;
 mod textures;
 pub mod vector;
+#[cfg(feature = "const-generics")]
+pub mod image;
 
 pub use num_traits;
-pub use textures::*;
 
 /// Calls the `OpDemoteToHelperInvocationEXT` instruction, which corresponds to discard() in HLSL
 #[spirv_std_macros::gpu_only]

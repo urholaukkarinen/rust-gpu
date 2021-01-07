@@ -1,8 +1,6 @@
 use crate::builder::libm_intrinsics;
 use crate::codegen_cx::CodegenCx;
-use rspirv::spirv::{
-    AccessQualifier, BuiltIn, Dim, ExecutionMode, ExecutionModel, ImageFormat, StorageClass,
-};
+use rspirv::spirv::{BuiltIn, ExecutionMode, ExecutionModel, StorageClass};
 use rustc_ast::ast::{AttrKind, Attribute, Lit, LitIntType, LitKind, NestedMetaItem};
 use rustc_data_structures::captures::Captures;
 use rustc_span::symbol::{Ident, Symbol};
@@ -37,13 +35,6 @@ pub struct Symbols {
     descriptor_set: Symbol,
     binding: Symbol,
     image_type: Symbol,
-    dim: Symbol,
-    depth: Symbol,
-    arrayed: Symbol,
-    multisampled: Symbol,
-    sampled: Symbol,
-    image_format: Symbol,
-    access_qualifier: Symbol,
     attributes: HashMap<Symbol, SpirvAttribute>,
     execution_modes: HashMap<Symbol, (ExecutionMode, ExecutionModeExtraDim)>,
     pub libm_intrinsics: HashMap<Symbol, libm_intrinsics::LibmIntrinsic>,
@@ -386,13 +377,6 @@ impl Symbols {
             descriptor_set: Symbol::intern("descriptor_set"),
             binding: Symbol::intern("binding"),
             image_type: Symbol::intern("image_type"),
-            dim: Symbol::intern("dim"),
-            depth: Symbol::intern("depth"),
-            arrayed: Symbol::intern("arrayed"),
-            multisampled: Symbol::intern("multisampled"),
-            sampled: Symbol::intern("sampled"),
-            image_format: Symbol::intern("image_format"),
-            access_qualifier: Symbol::intern("access_qualifier"),
             attributes,
             execution_modes,
             libm_intrinsics,
@@ -457,15 +441,7 @@ pub enum SpirvAttribute {
     Entry(Entry),
     DescriptorSet(u32),
     Binding(u32),
-    ImageType {
-        dim: Dim,
-        depth: u32,
-        arrayed: u32,
-        multisampled: u32,
-        sampled: u32,
-        image_format: ImageFormat,
-        access_qualifier: Option<AccessQualifier>,
-    },
+    ImageType,
     Sampler,
     SampledImage,
     Block,
@@ -532,7 +508,7 @@ pub(crate) fn parse_attrs_for_checking<'a>(
             .chain(args.into_iter().map(move |ref arg| {
                 let span = arg.span();
                 let parsed_attr = if arg.has_name(sym.image_type) {
-                    parse_image_type(sym, arg)?
+                    SpirvAttribute::ImageType
                 } else if arg.has_name(sym.descriptor_set) {
                     SpirvAttribute::DescriptorSet(parse_attr_int_value(arg)?)
                 } else if arg.has_name(sym.binding) {
@@ -565,113 +541,6 @@ pub(crate) fn parse_attrs_for_checking<'a>(
                 Ok((span, parsed_attr))
             }))
             .map(move |parse_attr_result| (attr, parse_attr_result))
-    })
-}
-
-fn parse_image_type(
-    sym: &Symbols,
-    attr: &NestedMetaItem,
-) -> Result<SpirvAttribute, ParseAttrError> {
-    let args = match attr.meta_item_list() {
-        Some(args) => args,
-        None => {
-            return Err((
-                attr.span(),
-                "image_type attribute must have arguments".to_string(),
-            ))
-        }
-    };
-    if args.len() != 6 && args.len() != 7 {
-        return Err((
-            attr.span(),
-            "image_type attribute must have 6 or 7 arguments".to_string(),
-        ));
-    }
-    let check = |idx: usize, sym: Symbol| -> Result<(), ParseAttrError> {
-        if args[idx].has_name(sym) {
-            Ok(())
-        } else {
-            Err((
-                args[idx].span(),
-                format!(
-                    "image_type attribute argument {} must be {}=...",
-                    idx + 1,
-                    sym
-                ),
-            ))
-        }
-    };
-    check(0, sym.dim)?;
-    check(1, sym.depth)?;
-    check(2, sym.arrayed)?;
-    check(3, sym.multisampled)?;
-    check(4, sym.sampled)?;
-    check(5, sym.image_format)?;
-    if args.len() == 7 {
-        check(6, sym.access_qualifier)?;
-    }
-    let arg_values = args
-        .iter()
-        .map(
-            |arg| match arg.meta_item().and_then(|arg| arg.name_value_literal()) {
-                Some(arg) => Ok(arg),
-                None => Err((
-                    arg.span(),
-                    "image_type attribute must be name=value".to_string(),
-                )),
-            },
-        )
-        .collect::<Result<Vec<_>, _>>()?;
-    let dim = match arg_values[0].kind {
-        LitKind::Str(dim, _) => match dim.as_str().parse() {
-            Ok(dim) => dim,
-            Err(()) => return Err((args[0].span(), "invalid dim value".to_string())),
-        },
-        _ => return Err((args[0].span(), "dim value must be str".to_string())),
-    };
-    let parse_lit = |idx: usize, name: &str| -> Result<u32, ParseAttrError> {
-        match arg_values[idx].kind {
-            LitKind::Int(v, _) => Ok(v as u32),
-            _ => Err((args[idx].span(), format!("{} value must be int", name))),
-        }
-    };
-    let depth = parse_lit(1, "depth")?;
-    let arrayed = parse_lit(2, "arrayed")?;
-    let multisampled = parse_lit(3, "multisampled")?;
-    let sampled = parse_lit(4, "sampled")?;
-    let image_format = match arg_values[5].kind {
-        LitKind::Str(image_format, _) => match image_format.as_str().parse() {
-            Ok(image_format) => image_format,
-            Err(()) => return Err((args[5].span(), "invalid image_format value".to_string())),
-        },
-        _ => return Err((args[5].span(), "image_format value must be str".to_string())),
-    };
-    let access_qualifier = if args.len() == 7 {
-        Some(match arg_values[6].kind {
-            LitKind::Str(access_qualifier, _) => match access_qualifier.as_str().parse() {
-                Ok(access_qualifier) => access_qualifier,
-                Err(()) => {
-                    return Err((args[6].span(), "invalid access_qualifier value".to_string()));
-                }
-            },
-            _ => {
-                return Err((
-                    args[6].span(),
-                    "access_qualifier value must be str".to_string(),
-                ));
-            }
-        })
-    } else {
-        None
-    };
-    Ok(SpirvAttribute::ImageType {
-        dim,
-        depth,
-        arrayed,
-        multisampled,
-        sampled,
-        image_format,
-        access_qualifier,
     })
 }
 

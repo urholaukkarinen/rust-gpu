@@ -107,7 +107,7 @@ impl CheckSpirvAttrVisitor<'_> {
                 },
 
                 SpirvAttribute::StorageClass(_)
-                | SpirvAttribute::ImageType { .. }
+                | SpirvAttribute::ImageType
                 | SpirvAttribute::Sampler
                 | SpirvAttribute::SampledImage
                 | SpirvAttribute::Block => match target {
