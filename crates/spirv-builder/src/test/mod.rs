@@ -1,3 +1,4 @@
+mod arch;
 mod basic;
 mod control_flow;
 

@@ -455,33 +455,6 @@ pub fn main() {}"#);
 }
 
 #[test]
-fn vector_extract_dynamic() {
-    val(r#"
-#[allow(unused_attributes)]
-#[spirv(fragment)]
-pub fn main() {
-    let vector = glam::Vec2::new(1.0, 2.0);
-    let element = unsafe { spirv_std::arch::vector_extract_dynamic(vector, 1) };
-    assert!(2.0 == element);
-}
-"#);
-}
-
-#[test]
-fn vector_insert_dynamic() {
-    val(r#"
-#[allow(unused_attributes)]
-#[spirv(fragment)]
-pub fn main() {
-    let vector = glam::Vec2::new(1.0, 2.0);
-    let expected = glam::Vec2::new(1.0, 3.0);
-    let new_vector = unsafe { spirv_std::arch::vector_insert_dynamic(vector, 1, 3.0) };
-    assert!(new_vector == expected);
-}
-"#);
-}
-
-#[test]
 fn mat3_vec3_multiply() {
     val(r#"
 #[allow(unused_attributes)]
