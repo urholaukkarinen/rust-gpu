@@ -71,6 +71,270 @@ pub fn all<V: Vector<bool, N>, const N: usize>(vector: V) -> bool {
     result
 }
 
+/// Result is true if `component` is an IEEE `NaN`, otherwise result is false.
+#[spirv_std_macros::gpu_only]
+#[doc(alias = "OpIsNan")]
+pub fn is_nan<F: Float>(component: F) -> bool {
+    let mut result = false;
+    unsafe {
+        asm! {
+            // Types and Constants
+            "%float = OpTypeFloat {width}",
+            "%bool = OpTypeBool",
+            "%uchar = OpTypeInt 8 0",
+            "%uchar_0 = OpConstant %uchar 0",
+            "%uchar_1 = OpConstant %uchar 1",
+            // Code
+            "%component = OpLoad %float {component}",
+            "%result = OpIsNan %bool %component",
+            "%boolean = OpSelect %uchar %result  %uchar_1 %uchar_0",
+            "OpStore {result} %boolean",
+            component = in(reg) &component,
+            width = const F::WIDTH,
+            result = in(reg) &mut result
+        }
+
+        result
+    }
+}
+
+/// Result is true if `vector` is an IEEE `NaN`, otherwise result is false.
+/// Results are computed per component.
+#[spirv_std_macros::gpu_only]
+#[doc(alias = "OpIsNan")]
+#[inline]
+pub fn is_nan_vector<F, V, V2, const N: usize>(vector: V) -> V2
+where
+    F: Float,
+    V: Vector<F, N>,
+    V2: Vector<bool, N>,
+{
+    let mut result = V2::default();
+
+    unsafe {
+        asm! {
+            // Types and Constants
+            "%float = OpTypeFloat {width}",
+            "%bool = OpTypeBool",
+            "%uchar = OpTypeInt 8 0",
+            "%uchar_0 = OpConstant %uchar 0",
+            "%uchar_1 = OpConstant %uchar 1",
+            "%bool_vec_type = OpTypeVector %bool {len}",
+            "%glam_vec_type = OpTypeVector %uchar {len}",
+            "%vector_type = OpTypeVector %float {len}",
+            // Code
+            "%vector = OpLoad %vector_type {vector}",
+            "%result = OpIsNan %bool_vec_type %vector",
+            "OpStore {result} %result",
+            vector = in(reg) &vector,
+            width = const F::WIDTH,
+            len = const N,
+            result = in(reg) &mut result
+        }
+    }
+
+    result
+}
+
+/// Result is true if `component` is an IEEE `Inf`, otherwise result is false.
+#[spirv_std_macros::gpu_only]
+#[doc(alias = "OpIsInf")]
+#[inline]
+pub fn is_inf<F: Float>(component: F) -> bool {
+    let mut result = false;
+
+    unsafe {
+        asm! {
+            "%component = OpLoad _ {component}",
+            "%float = OpTypeFloat {len}",
+            "%result = OpIsInf %float %component",
+            "OpStore {element} %result",
+            component = in(reg) &component,
+            len = const F::WIDTH,
+            element = in(reg) &mut result
+        }
+    }
+
+    result
+}
+
+/// Result is true if `vector` is an IEEE `Inf`, otherwise result is false.
+/// Results are computed per component.
+#[spirv_std_macros::gpu_only]
+#[doc(alias = "OpIsInf")]
+#[inline]
+pub fn is_inf_vector<F, V, V2, const N: usize>(vector: V) -> V2
+where
+    F: Float,
+    V: Vector<F, N>,
+    V2: Vector<bool, N>,
+{
+    let mut result = V2::default();
+
+    unsafe {
+        asm! {
+            "%vector = OpLoad _ {vector}",
+            "%bool = OpTypeBool",
+            "%vector_type = OpTypeVector %bool {len}",
+            "%result = OpIsInf %vector_type %vector",
+            "OpStore {element} %result",
+            vector = in(reg) &vector,
+            len = const N,
+            element = in(reg) &mut result
+        }
+    }
+
+    result
+}
+
+/// Result is true if `component` is an IEEE finite number, otherwise result
+/// is false. Requires `Kernel` capabilities.
+#[spirv_std_macros::gpu_only]
+#[doc(alias = "OpIsFinite")]
+#[inline]
+pub fn is_finite<F: Float>(component: F) -> bool {
+    let mut result = false;
+
+    unsafe {
+        asm! {
+            "%component = OpLoad _ {component}",
+            "%float = OpTypeFloat {len}",
+            "%result = OpIsFinite %float %component",
+            "OpStore {element} %result",
+            component = in(reg) &component,
+            len = const F::WIDTH,
+            element = in(reg) &mut result
+        }
+    }
+
+    result
+}
+
+/// Result is true if `component` is an IEEE finite number, otherwise result
+/// is false. Results are computed per component. Requires
+/// `Kernel` capabilities.
+#[spirv_std_macros::gpu_only]
+#[doc(alias = "OpIsFinite")]
+#[inline]
+pub fn is_finite_vector<F, V, V2, const N: usize>(vector: V) -> V2
+where
+    F: Float,
+    V: Vector<F, N>,
+    V2: Vector<bool, N>,
+{
+    let mut result = V2::default();
+
+    unsafe {
+        asm! {
+            "%vector = OpLoad _ {vector}",
+            "%result = OpIsFinite typeof*{vector} %vector",
+            "OpStore {element} %result",
+            vector = in(reg) &vector,
+            element = in(reg) &mut result
+        }
+    }
+
+    result
+}
+
+/// Result is true if `component` is an IEEE normal number, otherwise result
+/// is false. Requires `Kernel` capabilities.
+#[spirv_std_macros::gpu_only]
+#[doc(alias = "OpIsNormal")]
+#[inline]
+pub fn is_normal<F: Float>(component: F) -> bool {
+    let mut result = false;
+
+    unsafe {
+        asm! {
+            "%component = OpLoad _ {component}",
+            "%float = OpTypeFloat {len}",
+            "%result = OpIsNormal %float %component",
+            "OpStore {element} %result",
+            component = in(reg) &component,
+            len = const F::WIDTH,
+            element = in(reg) &mut result
+        }
+    }
+
+    result
+}
+
+/// Result is true if `component` is an IEEE normal number, otherwise result
+/// is false. Results are computed per component. Requires
+/// `Kernel` capabilities.
+#[spirv_std_macros::gpu_only]
+#[doc(alias = "OpIsNormal")]
+#[inline]
+pub fn is_normal_vector<F, V, V2, const N: usize>(vector: V) -> V2
+where
+    F: Float,
+    V: Vector<F, N>,
+    V2: Vector<bool, N>,
+{
+    let mut result = V2::default();
+
+    unsafe {
+        asm! {
+            "%vector = OpLoad _ {vector}",
+            "%result = OpIsNormal typeof*{vector} %vector",
+            "OpStore {element} %result",
+            vector = in(reg) &vector,
+            element = in(reg) &mut result
+        }
+    }
+
+    result
+}
+
+/// Result is true if `component` has its sign bit set, otherwise result
+/// is false. Requires `Kernel` capabilities.
+#[spirv_std_macros::gpu_only]
+#[doc(alias = "OpSignBitSet")]
+#[inline]
+pub fn sign_bit_set<F: Float>(component: F) -> bool {
+    let mut result = false;
+
+    unsafe {
+        asm! {
+            "%component = OpLoad _ {component}",
+            "%result = OpSignBitSet _ %component",
+            "OpStore {element} %result",
+            component = in(reg) &component,
+            element = in(reg) &mut result
+        }
+    }
+
+    result
+}
+
+/// Result is true if component in `vector` has its sign bit set, otherwise
+/// result is false. Results are computed per component. Requires
+/// `Kernel` capabilities.
+#[spirv_std_macros::gpu_only]
+#[doc(alias = "OpSignBitSet")]
+#[inline]
+pub fn sign_bit_set_vector<F, V, V2, const N: usize>(vector: V) -> V2
+where
+    F: Float,
+    V: Vector<F, N>,
+    V2: Vector<bool, N>,
+{
+    let mut result = V2::default();
+
+    unsafe {
+        asm! {
+            "%vector = OpLoad _ {vector}",
+            "%result = OpSignBitSet _ %vector",
+            "OpStore {element} %result",
+            vector = in(reg) &vector,
+            element = in(reg) &mut result
+        }
+    }
+
+    result
+}
+
 /// Extract a single, dynamically selected, component of a vector.
 ///
 /// # Safety

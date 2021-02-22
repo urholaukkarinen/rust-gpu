@@ -4,6 +4,7 @@ pub trait Sealed {}
 
 impl Sealed for bool {}
 impl Sealed for f32 {}
+impl Sealed for f64 {}
 impl Sealed for u8 {}
 impl Sealed for u16 {}
 impl Sealed for u32 {}
