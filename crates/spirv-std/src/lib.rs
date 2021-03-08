@@ -78,6 +78,7 @@ pub mod arch;
 pub mod float;
 pub mod integer;
 pub mod memory;
+pub mod number;
 pub mod scalar;
 pub(crate) mod sealed;
 pub mod storage_class;
