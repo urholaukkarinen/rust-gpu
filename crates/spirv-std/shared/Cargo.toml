@@ -1,0 +1,15 @@
+[package]
+name = "spirv-std-shared"
+version = "0.3.0"
+authors = ["Erin Power <erin.power@embark-studios.com>"]
+edition = "2018"
+
+# See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html
+
+[features]
+macros = ["proc-macro2", "quote", "syn"]
+
+[dependencies]
+proc-macro2 = { version = "1.0.24", optional = true }
+quote = { version = "1.0.9", optional = true }
+syn = { version = "1.0.64", optional = true }

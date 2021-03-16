@@ -2103,14 +2103,17 @@ version = "0.3.0"
 dependencies = [
  "num-traits",
  "spirv-std-macros 0.3.0",
+ "spirv-std-shared",
 ]
 
 [[package]]
 name = "spirv-std-macros"
 version = "0.3.0"
 dependencies = [
+ "heck",
  "proc-macro2",
  "quote",
+ "spirv-std-shared",
  "syn",
 ]
 
@@ -2120,6 +2123,15 @@ version = "0.3.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "d7ecfdc5a8fc98f8c6071b5b30ce13c896c9268abf04cc53e68cae1ebaf5dc60"
 dependencies = [
+ "quote",
+ "syn",
+]
+
+[[package]]
+name = "spirv-std-shared"
+version = "0.3.0"
+dependencies = [
+ "proc-macro2",
  "quote",
  "syn",
 ]

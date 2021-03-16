@@ -47,10 +47,25 @@
 // crate-specific exceptions:
 #![allow()]
 
+mod image;
+
 use proc_macro::TokenStream;
 use proc_macro2::{Delimiter, Group, Ident, Span, TokenTree};
 
 use syn::{punctuated::Punctuated, spanned::Spanned, ItemFn, Token};
+
+use quote::ToTokens;
+
+#[proc_macro]
+#[doc(hidden)]
+// The `Image` is supposed to be used in the type position, which
+// uses `PascalCase`.
+#[allow(nonstandard_style)]
+pub fn Image(item: TokenStream) -> TokenStream {
+    let output = syn::parse_macro_input!(item as image::ImageType).into_token_stream();
+
+    output.into()
+}
 
 #[proc_macro_attribute]
 pub fn spirv(_attr: TokenStream, item: TokenStream) -> TokenStream {

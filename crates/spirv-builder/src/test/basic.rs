@@ -61,6 +61,17 @@ pub fn no_dce() {
 }
 
 #[test]
+fn image_sample() {
+    val(r#"
+type Image = spirv_std::spirv_std_macros::Image!(2D, format=rgba32f);
+#[spirv(fragment)]
+pub fn main(image: storage_class::UniformConstant<Image>, sampler: Input<Sampler>) {
+    image.sample(&sampler, glam::Vec2::new(0.0, 1.0));
+}
+"#);
+}
+
+#[test]
 fn add_two_ints() {
     dis_fn(
         r#"
