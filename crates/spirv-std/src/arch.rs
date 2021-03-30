@@ -6,10 +6,12 @@
 use crate::{scalar::Scalar, vector::Vector};
 
 mod arithmetic;
+mod conversion;
 mod derivative;
 mod primitive;
 
 pub use arithmetic::*;
+pub use conversion::*;
 pub use derivative::*;
 pub use primitive::*;
 
