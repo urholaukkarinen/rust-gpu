@@ -4,6 +4,7 @@ use std::error::Error;
 fn build_shader(path_to_create: &str) -> Result<(), Box<dyn Error>> {
     SpirvBuilder::new(path_to_create)
         .spirv_version(1, 0)
+        .target("spirv-unknown-vulkan1.1")
         .build()?;
     Ok(())
 }

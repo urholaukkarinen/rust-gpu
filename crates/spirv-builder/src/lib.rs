@@ -108,7 +108,9 @@ pub struct SpirvBuilder {
     release: bool,
     spirv_version: Option<(u8, u8)>,
     memory_model: Option<MemoryModel>,
+    target: Option<String>,
 }
+
 impl SpirvBuilder {
     pub fn new(path_to_crate: impl AsRef<Path>) -> Self {
         Self {
@@ -117,6 +119,7 @@ impl SpirvBuilder {
             release: true,
             spirv_version: None,
             memory_model: None,
+            target: None,
         }
     }
 
@@ -141,6 +144,12 @@ impl SpirvBuilder {
     /// Sets the SPIR-V memory model. Defaults to Vulkan.
     pub fn memory_model(mut self, memory_model: MemoryModel) -> Self {
         self.memory_model = Some(memory_model);
+        self
+    }
+
+    /// Sets target to build for. Defaults to `spirv-unknown-unknown`.
+    pub fn target(mut self, target: impl Into<String>) -> Self {
+        self.target = Some(target.into());
         self
     }
 
@@ -250,7 +259,7 @@ fn invoke_rustc(builder: &SpirvBuilder, multimodule: bool) -> Result<PathBuf, Sp
         "-Z",
         "build-std=core",
         "--target",
-        "spirv-unknown-unknown",
+        builder.target.as_deref().unwrap_or("spirv-unknown-unknown"),
     ]);
     if builder.release {
         cargo.arg("--release");
