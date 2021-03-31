@@ -134,7 +134,7 @@ pub unsafe fn report_intersection_khr(hit: f32, hit_kind: u32) -> bool {
 #[doc(alias = "OpIgnoreIntersectionKHR")]
 #[inline]
 pub unsafe fn ignore_intersection_khr() {
-    asm!("OpIgnoreIntersectionKHR");
+    asm!("OpIgnoreIntersectionKHR", "%unused = OpLabel")
 }
 
 /// Terminates the invocation that executes it, stops the ray traversal, accepts
@@ -145,7 +145,7 @@ pub unsafe fn ignore_intersection_khr() {
 #[doc(alias = "OpTerminateRayKHR")]
 #[inline]
 pub unsafe fn terminate_ray_khr() {
-    asm!("OpTerminateRayKHR");
+    asm!("OpTerminateRayKHR", "%unused = OpLabel")
 }
 
 /// Invoke a callable shader.

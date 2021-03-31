@@ -98,7 +98,12 @@ pub fn outgoing_edges(block: &Block) -> Vec<Word> {
                     .map(|op| op.unwrap_id_ref()),
             )
             .collect(),
-        Op::Return | Op::ReturnValue | Op::Kill | Op::Unreachable => Vec::new(),
+        Op::Return
+        | Op::ReturnValue
+        | Op::Kill
+        | Op::Unreachable
+        | Op::IgnoreIntersectionKHR
+        | Op::TerminateRayKHR => Vec::new(),
         _ => panic!("Invalid block terminator: {:?}", terminator),
     }
 }

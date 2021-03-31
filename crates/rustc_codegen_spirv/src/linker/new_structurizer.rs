@@ -168,7 +168,12 @@ impl Structurizer<'_> {
             let block_id = self.func.blocks()[block].label_id().unwrap();
             let terminator = self.func.blocks()[block].instructions.last().unwrap();
             let mut region = match terminator.class.opcode {
-                Op::Return | Op::ReturnValue | Op::Kill | Op::Unreachable => Region {
+                Op::Return
+                | Op::ReturnValue
+                | Op::Kill
+                | Op::IgnoreIntersectionKHR
+                | Op::TerminateRayKHR
+                | Op::Unreachable => Region {
                     merge: block,
                     merge_id: block_id,
                     exits: indexmap! {},
