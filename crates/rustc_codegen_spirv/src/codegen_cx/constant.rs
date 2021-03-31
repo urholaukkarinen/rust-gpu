@@ -524,6 +524,10 @@ impl<'tcx> CodegenCx<'tcx> {
                 .tcx
                 .sess
                 .fatal("Cannot create a constant sampled image value"),
+            SpirvType::AccelerationStructureKhr => self
+                .tcx
+                .sess
+                .fatal("Cannot create a constant acceleration structure"),
         }
     }
 }

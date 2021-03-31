@@ -80,6 +80,7 @@ pub enum SpirvType {
     SampledImage {
         image_type: Word,
     },
+    AccelerationStructureKhr,
 }
 
 impl SpirvType {
@@ -247,6 +248,7 @@ impl SpirvType {
                 access_qualifier,
             ),
             Self::Sampler => cx.emit_global().type_sampler(),
+            Self::AccelerationStructureKhr => cx.emit_global().type_acceleration_structure_khr(),
             Self::SampledImage { image_type } => cx.emit_global().type_sampled_image(image_type),
         };
         cx.type_cache.def(result, self);
@@ -320,7 +322,8 @@ impl SpirvType {
             Self::Void
             | Self::Opaque { .. }
             | Self::RuntimeArray { .. }
-            | Self::Function { .. } => return None,
+            | Self::Function { .. }
+            | Self::AccelerationStructureKhr => return None,
 
             Self::Bool => Size::from_bytes(1),
             Self::Integer(width, _) | Self::Float(width) => Size::from_bits(width),
@@ -340,9 +343,10 @@ impl SpirvType {
     pub fn alignof<'tcx>(&self, cx: &CodegenCx<'tcx>) -> Align {
         match *self {
             // Types that have no concept of size or alignment.
-            Self::Void | Self::Opaque { .. } | Self::Function { .. } => {
-                Align::from_bytes(0).unwrap()
-            }
+            Self::Void
+            | Self::Opaque { .. }
+            | Self::Function { .. }
+            | Self::AccelerationStructureKhr => Align::from_bytes(0).unwrap(),
 
             Self::Bool => Align::from_bytes(1).unwrap(),
             Self::Integer(width, _) | Self::Float(width) => Align::from_bits(width as u64).unwrap(),
@@ -499,6 +503,9 @@ impl fmt::Debug for SpirvTypePrinter<'_, '_> {
                 .field("id", &self.id)
                 .field("image_type", &self.cx.debug_type(image_type))
                 .finish(),
+            SpirvType::AccelerationStructureKhr => {
+                f.debug_struct("AccelerationStructureKhr").finish()
+            }
         };
         {
             let mut debug_stack = DEBUG_STACK.lock().unwrap();
@@ -654,6 +661,7 @@ impl SpirvTypePrinter<'_, '_> {
                 .debug_struct("SampledImage")
                 .field("image_type", &self.cx.debug_type(image_type))
                 .finish(),
+            SpirvType::AccelerationStructureKhr => f.write_str("AccelerationStructureKhr"),
         }
     }
 }

@@ -8,10 +8,12 @@ use crate::{scalar::Scalar, vector::Vector};
 mod arithmetic;
 mod derivative;
 mod primitive;
+mod ray_tracing;
 
 pub use arithmetic::*;
 pub use derivative::*;
 pub use primitive::*;
+pub use ray_tracing::*;
 
 /// Result is true if any component of `vector` is true, otherwise result is
 /// false.

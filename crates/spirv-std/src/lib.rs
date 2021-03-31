@@ -72,6 +72,7 @@ pub extern crate spirv_std_macros as macros;
 pub mod arch;
 pub mod float;
 pub mod integer;
+pub mod ray_tracing;
 pub mod scalar;
 pub(crate) mod sealed;
 mod textures;
